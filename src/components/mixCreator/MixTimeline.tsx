@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import MixMiniMap from "./MixMiniMap";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -617,6 +618,16 @@ const MixTimeline = ({
       ref={timelineRef}
       className={`w-full h-full bg-background border rounded-lg p-4 flex flex-col gap-4 ${isFullscreen ? "fixed inset-0 z-50" : ""}`}
     >
+      {/* Mix Mini Map */}
+      <div className="mb-4 sticky top-0 z-10">
+        <MixMiniMap
+          tracks={tracks}
+          onTrackMove={onTrackMove}
+          selectedTrackId={selectedTrackId}
+          onTrackSelect={setSelectedTrackId}
+        />
+      </div>
+
       {/* Header with controls and info */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
@@ -1132,14 +1143,31 @@ const MixTimeline = ({
                         className={`bg-card rounded-lg p-3 border shadow-sm ${selectedTrackId === track.id ? "ring-2 ring-primary" : ""}`}
                       >
                         <div className="flex items-center gap-2 mb-2">
-                          {isEditable && (
-                            <div
-                              {...provided.dragHandleProps}
-                              className="p-2 rounded-md hover:bg-accent cursor-move"
-                            >
-                              <Music className="h-4 w-4" />
+                          <div className="flex items-center">
+                            {isEditable && (
+                              <div
+                                {...provided.dragHandleProps}
+                                className="p-2 rounded-md hover:bg-accent cursor-move mr-2"
+                              >
+                                <span className="font-bold text-lg">
+                                  {index + 1}
+                                </span>
+                              </div>
+                            )}
+                            <div className="w-10 h-10 rounded-md overflow-hidden mr-2">
+                              {track.waveform ? (
+                                <img
+                                  src={track.waveform}
+                                  alt={track.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-muted flex items-center justify-center">
+                                  <Music className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
 
                           <div className="flex-1">
                             <h3 className="font-medium">{track.title}</h3>
@@ -1389,7 +1417,7 @@ const MixTimeline = ({
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <div
-                                        className="absolute top-0 bottom-0 w-0.5 bg-yellow-500 cursor-pointer"
+                                        className="absolute top-0 bottom-0 w-0.5 bg-yellow-500 cursor-pointer z-10"
                                         style={{ left: `${position}%` }}
                                         onClick={() =>
                                           setCurrentTime(
@@ -1398,6 +1426,9 @@ const MixTimeline = ({
                                         }
                                       >
                                         <div className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-yellow-500" />
+                                        <div className="absolute -top-6 -translate-x-1/2 bg-yellow-500 text-white text-xs px-1 py-0.5 rounded whitespace-nowrap">
+                                          {cue.type}
+                                        </div>
                                       </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
@@ -1424,7 +1455,7 @@ const MixTimeline = ({
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <div
-                                        className="absolute top-0 h-full bg-green-500/20 border-l border-r border-green-500 cursor-pointer"
+                                        className="absolute top-0 h-full bg-green-500/20 border-l-2 border-r-2 border-green-500 cursor-pointer z-10"
                                         style={{
                                           left: `${startPosition}%`,
                                           width: `${width}%`,
@@ -1436,8 +1467,12 @@ const MixTimeline = ({
                                           )
                                         }
                                       >
-                                        <div className="absolute top-0 left-0 w-full text-center text-xs text-green-700 truncate px-1">
+                                        <div className="absolute top-0 left-0 w-full text-center text-xs font-semibold bg-green-500/70 text-white truncate px-1">
                                           {loop.label}
+                                        </div>
+                                        <div className="absolute bottom-0 left-0 w-full text-center text-xs text-green-700 truncate px-1 bg-white/70">
+                                          {formatTime(loop.startTime)} -{" "}
+                                          {formatTime(loop.endTime)}
                                         </div>
                                       </div>
                                     </TooltipTrigger>
@@ -1457,7 +1492,7 @@ const MixTimeline = ({
                           {showTransitionMarkers &&
                             index < tracks.length - 1 && (
                               <div
-                                className="absolute top-0 bottom-0 w-1 bg-primary cursor-ew-resize"
+                                className="absolute top-0 bottom-0 w-1 bg-primary cursor-ew-resize z-20"
                                 style={{
                                   left: `${transitionPoints[track.id] || 30}%`,
                                 }}
@@ -1469,131 +1504,52 @@ const MixTimeline = ({
                                     );
                                   }
                                 }}
-                              />
+                              >
+                                <div className="absolute -top-6 -translate-x-1/2 bg-primary text-white text-xs px-2 py-1 rounded-full whitespace-nowrap">
+                                  Transition
+                                </div>
+                                <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white border-2 border-primary"></div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="absolute top-8 -translate-x-1/2 bg-white"
+                                  onClick={() => {
+                                    if (nextTrack) {
+                                      onPreviewTransition(
+                                        track.id,
+                                        nextTrack.id,
+                                      );
+                                    }
+                                  }}
+                                >
+                                  Edit Transition
+                                </Button>
+                              </div>
                             )}
 
                           {/* Current playback position */}
                           {currentTrackInfo &&
                             currentTrackInfo.trackId === track.id && (
                               <div
-                                className="absolute top-0 h-full w-0.5 bg-white z-10"
+                                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30"
                                 style={{
                                   left: `${currentTrackInfo.percentageInTrack}%`,
                                 }}
                               >
-                                <div className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-white" />
+                                <div className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-red-500" />
                               </div>
                             )}
                         </div>
-
-                        {/* Transition controls */}
-                        {index < tracks.length - 1 && nextTrack && (
-                          <div className="mt-2">
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium">
-                                  Transition to {nextTrack.title}:
-                                </span>
-                                {transition && transition.type && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {transition.type}
-                                  </Badge>
-                                )}
-                              </div>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-7"
-                                      onClick={() =>
-                                        handlePreviewTransition(
-                                          track.id,
-                                          nextTrack.id,
-                                        )
-                                      }
-                                    >
-                                      <Play className="h-3 w-3 mr-1" />
-                                      Preview
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Preview transition</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs">Position:</span>
-                              <Slider
-                                className="flex-1"
-                                value={[transitionPoints[track.id] || 30]}
-                                max={100}
-                                step={1}
-                                disabled={!isEditable}
-                                onValueChange={(value) =>
-                                  handleTransitionChange(
-                                    track.id,
-                                    nextTrack.id,
-                                    value,
-                                  )
-                                }
-                              />
-                              <span className="text-xs">
-                                {transitionPoints[track.id] || 30}%
-                              </span>
-                            </div>
-
-                            {transition && transition.notes && (
-                              <div className="mt-1 text-xs text-muted-foreground italic">
-                                Note: {transition.notes}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     )}
                   </Draggable>
                 );
               })}
               {provided.placeholder}
-
-              {/* Empty state */}
-              {tracks.length === 0 && (
-                <div className="flex flex-col items-center justify-center p-12 text-center bg-card rounded-lg border">
-                  <Music className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium">No tracks in your mix</h3>
-                  <p className="text-muted-foreground mt-2 mb-4">
-                    Add tracks from the library to start building your mix
-                  </p>
-                  {isEditable && (
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add First Track
-                    </Button>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </Droppable>
       </DragDropContext>
-
-      {/* Navigation buttons */}
-      {tracks.length > 0 && (
-        <div className="flex justify-between mt-2">
-          <Button variant="outline" size="sm" onClick={handleSkipBackward}>
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Previous Track
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleSkipForward}>
-            Next Track
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 };

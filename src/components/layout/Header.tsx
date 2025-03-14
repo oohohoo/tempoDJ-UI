@@ -1,5 +1,4 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import { Music, Library, FolderPlus, Settings, User } from "lucide-react";
 import { Button } from "../ui/button";
 import {
@@ -15,9 +14,21 @@ import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 interface HeaderProps {
   username?: string;
   avatarUrl?: string;
+  onNavigate?: (view: string) => void;
 }
 
-const Header = ({ username = "DJ User", avatarUrl = "" }: HeaderProps) => {
+const Header = ({
+  username = "DJ User",
+  avatarUrl = "",
+  onNavigate,
+}: HeaderProps) => {
+  const handleNavigation = (e: React.MouseEvent, view: string) => {
+    e.preventDefault();
+    if (onNavigate) {
+      onNavigate(view);
+    }
+  };
+
   return (
     <header className="w-full h-20 px-6 bg-background border-b border-border flex items-center justify-between sticky top-0 z-50">
       <div className="flex items-center space-x-2">
@@ -26,24 +37,13 @@ const Header = ({ username = "DJ User", avatarUrl = "" }: HeaderProps) => {
       </div>
 
       <nav className="flex items-center space-x-6">
-        <Link to="/track-library">
-          <Button variant="ghost" className="flex items-center space-x-2">
-            <Library className="h-5 w-5" />
-            <span>Track Library</span>
-          </Button>
-        </Link>
-        <Link to="/saved-mixes">
-          <Button variant="ghost" className="flex items-center space-x-2">
-            <FolderPlus className="h-5 w-5" />
-            <span>Saved Mixes</span>
-          </Button>
-        </Link>
-        <Link to="/create-mix">
-          <Button className="flex items-center space-x-2">
-            <Music className="h-5 w-5" />
-            <span>Create New Mix</span>
-          </Button>
-        </Link>
+        <Button
+          className="flex items-center space-x-2"
+          onClick={(e) => handleNavigation(e, "mixCreator")}
+        >
+          <Music className="h-5 w-5" />
+          <span>Create New Mix</span>
+        </Button>
       </nav>
 
       <div className="flex items-center space-x-4">
@@ -67,11 +67,11 @@ const Header = ({ username = "DJ User", avatarUrl = "" }: HeaderProps) => {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => handleNavigation(e, "profile")}>
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => handleNavigation(e, "settings")}>
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </DropdownMenuItem>

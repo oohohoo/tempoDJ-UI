@@ -176,22 +176,28 @@ const TrackGrid: React.FC<TrackGridProps> = ({
               className="overflow-hidden hover:shadow-lg transition-shadow duration-300"
               onClick={() => onTrackSelect(track)}
             >
-              <div className="relative h-40 bg-muted">
-                {track.imageUrl ? (
-                  <img 
-                    src={track.imageUrl} 
-                    alt={track.title} 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center w-full h-full bg-secondary">
-                    <Music className="h-12 w-12 text-secondary-foreground opacity-50" />
-                  </div>
-                )}
+              <div className="flex items-center p-3">
+                <div className="w-12 h-12 rounded-md overflow-hidden mr-3 flex-shrink-0">
+                  {track.imageUrl ? (
+                    <img 
+                      src={track.imageUrl} 
+                      alt={track.title} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center w-full h-full bg-secondary">
+                      <Music className="h-6 w-6 text-secondary-foreground opacity-50" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium truncate">{track.title}</h4>
+                  <p className="text-sm text-muted-foreground truncate">{track.artist}</p>
+                </div>
                 <Button 
                   variant="secondary" 
                   size="icon" 
-                  className="absolute bottom-2 right-2 rounded-full bg-background/80 hover:bg-background"
+                  className="ml-2 rounded-full bg-background/80 hover:bg-background"
                   onClick={(e) => {
                     e.stopPropagation();
                     onTrackPlay(track);

@@ -21,6 +21,8 @@ import {
   SkipForward,
   Play,
   Pause,
+  Wand2,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,10 +30,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   CardDescription,
   CardFooter,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +69,8 @@ import TrackSelector from "./TrackSelector";
 import MixTimeline from "./MixTimeline";
 import TransitionEditor from "./TransitionEditor";
 import HarmonicWheel from "../common/HarmonicWheel";
+import MixCreationSelector from "./MixCreationSelector";
+import SmartMixGenerator from "./SmartMixGenerator";
 
 interface Track {
   id: string;
@@ -80,6 +84,15 @@ interface Track {
   compatible?: boolean;
   energy?: number;
   genre?: string;
+  startPosition?: number;
+  fadeInDuration?: number;
+  fadeOutDuration?: number;
+  volume?: number;
+  eqSettings?: {
+    low: number;
+    mid: number;
+    high: number;
+  };
 }
 
 interface Transition {
@@ -91,6 +104,11 @@ interface Transition {
   startPoint?: number;
   endPoint?: number;
   effectsApplied?: string[];
+  eqSettings?: {
+    lowCut: number;
+    midCut: number;
+    highCut: number;
+  };
 }
 
 interface MixCreatorProps {
@@ -110,6 +128,9 @@ const MixCreator = ({
   onSaveMix = () => {},
   onExportMix = () => {},
 }: MixCreatorProps) => {
+  const [creationMethod, setCreationMethod] = useState<
+    "selector" | "manual" | "smart"
+  >("selector");
   const [mixTitle, setMixTitle] = useState(initialMixTitle);
   const [mixDescription, setMixDescription] = useState("");
   const [mixGenre, setMixGenre] = useState("");
@@ -216,6 +237,8 @@ const MixCreator = ({
           : track.duration,
       color: track.color || getRandomColor(),
       energy: track.energy || Math.floor(Math.random() * 30) + 50, // Random energy level if not provided
+      startPosition: calculateStartPosition(tracks),
+      volume: 100,
     };
 
     setTracks([...tracks, trackToAdd]);
@@ -240,6 +263,23 @@ const MixCreator = ({
         },
       });
     }
+  };
+
+  // Calculate the start position for a new track
+  const calculateStartPosition = (currentTracks: Track[]) => {
+    if (currentTracks.length === 0) return 0;
+
+    const lastTrack = currentTracks[currentTracks.length - 1];
+    const lastTrackStart = lastTrack.startPosition || 0;
+    const lastTrackDuration =
+      typeof lastTrack.duration === "string"
+        ? parseInt(lastTrack.duration.split(":")[0]) * 60 +
+          parseInt(lastTrack.duration.split(":")[1])
+        : lastTrack.duration;
+
+    // Position the new track to overlap with the last track by 30 seconds (or less if the track is shorter)
+    const overlap = Math.min(30, lastTrackDuration * 0.2);
+    return lastTrackStart + lastTrackDuration - overlap;
   };
 
   const handleRemoveTrack = (trackId: string) => {
@@ -447,14 +487,18 @@ const MixCreator = ({
 
   // Calculate total mix duration in seconds
   const calculateTotalDuration = () => {
-    return tracks.reduce((total, track) => {
-      const duration =
-        typeof track.duration === "string"
-          ? parseInt(track.duration.split(":")[0]) * 60 +
-            parseInt(track.duration.split(":")[1])
-          : track.duration;
-      return total + duration;
-    }, 0);
+    if (tracks.length === 0) return 0;
+
+    // Find the last track's start position and add its duration
+    const lastTrack = tracks[tracks.length - 1];
+    const lastTrackStart = lastTrack.startPosition || 0;
+    const lastTrackDuration =
+      typeof lastTrack.duration === "string"
+        ? parseInt(lastTrack.duration.split(":")[0]) * 60 +
+          parseInt(lastTrack.duration.split(":")[1])
+        : lastTrack.duration;
+
+    return lastTrackStart + lastTrackDuration;
   };
 
   // Format seconds to MM:SS format
@@ -475,700 +519,269 @@ const MixCreator = ({
       "#06b6d4", // Cyan
       "#0ea5e9", // Sky
       "#6366f1", // Indigo
-      "#8b5cf6", // Violet
       "#d946ef", // Fuchsia
     ];
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
-  // Check if there are any key compatibility issues in the mix
-  const hasKeyCompatibilityIssues = () => {
-    if (tracks.length <= 1) return false;
-
-    for (let i = 0; i < tracks.length - 1; i++) {
-      const currentTrack = tracks[i];
-      const nextTrack = tracks[i + 1];
-
-      // This is a simplified check - in a real app, you would use the Camelot wheel
-      // to determine if keys are compatible
-      const keyMap: Record<string, string[]> = {
-        Am: ["Em", "Dm", "C", "G", "F"],
-        Bm: ["F#m", "Em", "D", "A", "G"],
-        Cm: ["Gm", "Fm", "Eb", "Bb", "Ab"],
-        Dm: ["Am", "Gm", "F", "C", "Bb"],
-        Em: ["Bm", "Am", "G", "D", "C"],
-        C: ["G", "F", "Am", "Em", "Dm"],
-        D: ["A", "G", "Bm", "F#m", "Em"],
-        E: ["B", "A", "C#m", "G#m", "F#m"],
-        F: ["C", "Bb", "Dm", "Am", "Gm"],
-        G: ["D", "C", "Em", "Bm", "Am"],
-        A: ["E", "D", "F#m", "C#m", "Bm"],
-        B: ["F#", "E", "G#m", "D#m", "C#m"],
-      };
-
-      const compatibleKeys = keyMap[currentTrack.key] || [];
-      if (!compatibleKeys.includes(nextTrack.key)) {
-        return true;
-      }
-    }
-
-    return false;
-  };
-
-  // Check if there are any BPM transition issues (large BPM jumps)
-  const hasBpmTransitionIssues = () => {
-    if (tracks.length <= 1) return false;
-
-    for (let i = 0; i < tracks.length - 1; i++) {
-      const currentTrack = tracks[i];
-      const nextTrack = tracks[i + 1];
-
-      // Consider a BPM difference of more than 8 as potentially problematic
-      if (Math.abs(currentTrack.bpm - nextTrack.bpm) > 8) {
-        return true;
-      }
-    }
-
-    return false;
-  };
-
+  // Render the component UI
   return (
-    <div className="flex flex-col h-full bg-background">
-      {/* Header with mix title and actions */}
-      <div className="p-4 border-b flex items-center justify-between bg-white">
-        <div className="flex items-center gap-4 flex-1">
-          <Music className="h-6 w-6 text-primary" />
-          <Input
-            value={mixTitle}
-            onChange={(e) => setMixTitle(e.target.value)}
-            className="max-w-xs font-medium text-lg"
-            placeholder="Enter mix title"
-          />
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Music className="h-3 w-3" />
-              {tracks.length} tracks
-            </Badge>
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatDuration(calculateTotalDuration())}
-            </Badge>
-            {mixGenre && (
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Tag className="h-3 w-3" />
-                {mixGenre}
-              </Badge>
-            )}
-            <Badge
-              variant={mixProgress === 100 ? "default" : "outline"}
-              className="flex items-center gap-1"
-            >
-              {mixProgress === 100
-                ? "Complete"
-                : `${Math.floor(mixProgress)}% Complete`}
-            </Badge>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
+    <div className="w-full h-full bg-background">
+      {creationMethod === "selector" && (
+        <MixCreationSelector
+          onSelectMethod={(method) =>
+            setCreationMethod(method === "manual" ? "manual" : "smart")
+          }
+        />
+      )}
+
+      {creationMethod === "smart" && (
+        <SmartMixGenerator
+          onGenerateMix={(generatedTracks) => {
+            setTracks(generatedTracks);
+            setCreationMethod("manual");
+          }}
+          onCancel={() => setCreationMethod("selector")}
+        />
+      )}
+
+      {creationMethod === "manual" && (
+        <div className="flex flex-col h-full">
+          {/* Header with mix info */}
+          <div className="p-4 border-b">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex-1">
+                <Input
+                  placeholder="Mix title"
+                  className="text-xl font-bold border-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
+                  value={mixTitle}
+                  onChange={(e) => setMixTitle(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  size="icon"
-                  onClick={() => setShowHarmonicWheel(true)}
+                  size="sm"
+                  onClick={() => setShowHarmonicWheel(!showHarmonicWheel)}
                 >
-                  <BarChart2 className="h-4 w-4" />
+                  <Music className="mr-2 h-4 w-4" />
+                  Harmonic Wheel
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>View Harmonic Wheel</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <Button
-            variant="outline"
-            onClick={() => setShowShareDialog(true)}
-            className="gap-2"
-          >
-            <Share2 className="h-4 w-4" />
-            Share
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={handleExportMix}
-            disabled={isExporting || tracks.length === 0}
-            className="gap-2"
-          >
-            {isExporting ? (
-              <span className="flex items-center gap-2">
-                <div className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-                Exporting...
-              </span>
-            ) : (
-              <>
-                <Download className="h-4 w-4" />
-                Export
-              </>
-            )}
-          </Button>
-
-          <Button
-            onClick={handleSaveMix}
-            disabled={isSaving || tracks.length === 0}
-            className="gap-2"
-          >
-            {isSaving ? (
-              <span className="flex items-center gap-2">
-                <div className="h-4 w-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin"></div>
-                Saving...
-              </span>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Mix
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {/* Save success message */}
-      {showSaveSuccess && (
-        <div className="px-4 py-2 bg-green-50 border-b border-green-200 flex items-center justify-between">
-          <span className="text-green-700 flex items-center gap-2">
-            <Info className="h-4 w-4" />
-            Mix saved successfully!
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowSaveSuccess(false)}
-            className="h-6 text-green-700 hover:text-green-800 hover:bg-green-100"
-          >
-            Dismiss
-          </Button>
-        </div>
-      )}
-
-      {/* Mix description */}
-      <div className="px-4 py-2 border-b bg-white">
-        <Textarea
-          placeholder="Add a description for your mix..."
-          className="resize-none h-16"
-          value={mixDescription}
-          onChange={(e) => setMixDescription(e.target.value)}
-        />
-      </div>
-
-      {/* Warning alerts for key or BPM issues */}
-      {(hasKeyCompatibilityIssues() || hasBpmTransitionIssues()) && (
-        <div className="px-4 py-2 border-b">
-          {hasKeyCompatibilityIssues() && (
-            <Alert variant="warning" className="mb-2">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Key Compatibility Warning</AlertTitle>
-              <AlertDescription>
-                Some tracks in your mix have keys that may not be harmonically
-                compatible. Check the harmonic wheel to ensure smooth
-                transitions.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {hasBpmTransitionIssues() && (
-            <Alert variant="warning">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>BPM Transition Warning</AlertTitle>
-              <AlertDescription>
-                There are significant BPM changes between some tracks. Consider
-                reordering tracks or using tempo adjustment during transitions.
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
-      )}
-
-      {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Track selector sidebar */}
-        <TrackSelector
-          selectedTrack={selectedTrack}
-          onTrackSelect={(track) => {
-            if (tracks.some((t) => t.id === track.id)) {
-              setSelectedTrack(track);
-            } else {
-              handleAddTrack(track);
-            }
-          }}
-          compatibleKeys={selectedTrack ? getCompatibleKeys() : undefined}
-        />
-
-        {/* Main editor area */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="flex-1 flex flex-col"
-          >
-            <div className="px-4 pt-4 bg-gray-50 border-b">
-              <TabsList>
-                <TabsTrigger
-                  value="timeline"
-                  className="flex items-center gap-1"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowShareDialog(true)}
                 >
-                  <BarChart2 className="h-4 w-4" />
-                  Timeline
-                </TabsTrigger>
-                <TabsTrigger
-                  value="transition"
-                  className="flex items-center gap-1"
+                  <Share2 className="mr-2 h-4 w-4" />
+                  Share
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportMix}
+                  disabled={isExporting}
                 >
-                  <Sliders className="h-4 w-4" />
-                  Transition Editor
-                </TabsTrigger>
-                <TabsTrigger
-                  value="preview"
-                  className="flex items-center gap-1"
+                  <Download className="mr-2 h-4 w-4" />
+                  {isExporting ? "Exporting..." : "Export"}
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleSaveMix}
+                  disabled={isSaving}
                 >
-                  <Headphones className="h-4 w-4" />
-                  Preview
-                </TabsTrigger>
-                <TabsTrigger
-                  value="settings"
-                  className="flex items-center gap-1"
-                >
-                  <Settings className="h-4 w-4" />
-                  Mix Settings
-                </TabsTrigger>
-              </TabsList>
+                  <Save className="mr-2 h-4 w-4" />
+                  {isSaving ? "Saving..." : "Save Mix"}
+                </Button>
+              </div>
             </div>
 
-            <TabsContent
-              value="timeline"
-              className="flex-1 p-4 overflow-auto m-0"
-            >
-              {tracks.length > 0 ? (
-                <MixTimeline
-                  tracks={tracks}
-                  onTrackMove={handleTrackMove}
-                  onTrackRemove={handleRemoveTrack}
-                  onPreviewTransition={handleTransitionSelect}
-                  transitions={transitions}
-                />
-              ) : (
-                <Card className="w-full h-full flex items-center justify-center">
-                  <CardContent className="text-center py-12">
-                    <Music className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-medium mb-2">
-                      No tracks in your mix yet
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      Select tracks from the library to add them to your mix
-                    </p>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add First Track
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
+            <div className="flex items-center justify-between">
+              <div className="flex-1 flex items-center gap-4">
+                <div className="w-64">
+                  <Select
+                    value={mixGenre || ""}
+                    onValueChange={setMixGenre}
+                    placeholder="Select genre"
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Select genre" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="house">House</SelectItem>
+                      <SelectItem value="techno">Techno</SelectItem>
+                      <SelectItem value="trance">Trance</SelectItem>
+                      <SelectItem value="drum-and-bass">Drum & Bass</SelectItem>
+                      <SelectItem value="dubstep">Dubstep</SelectItem>
+                      <SelectItem value="ambient">Ambient</SelectItem>
+                      <SelectItem value="hip-hop">Hip Hop</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <TabsContent
-              value="transition"
-              className="flex-1 p-4 overflow-auto m-0"
-            >
-              {currentTransition.fromTrack && currentTransition.toTrack ? (
-                <TransitionEditor
-                  currentTrack={{
-                    id: currentTransition.fromTrack.id,
-                    title: currentTransition.fromTrack.title,
-                    artist: currentTransition.fromTrack.artist,
-                    waveform: currentTransition.fromTrack.waveform,
-                  }}
-                  nextTrack={{
-                    id: currentTransition.toTrack.id,
-                    title: currentTransition.toTrack.title,
-                    artist: currentTransition.toTrack.artist,
-                    waveform: currentTransition.toTrack.waveform,
-                  }}
-                  transitionDuration={currentTransition.duration}
-                  transitionNotes={currentTransition.notes}
-                  transitionType={currentTransition.type}
-                  effectsApplied={currentTransition.effectsApplied}
-                  onSaveTransition={handleSaveTransition}
-                />
-              ) : (
-                <Card className="w-full h-full flex items-center justify-center">
-                  <CardContent className="text-center py-12">
-                    <h3 className="text-xl font-medium mb-2">
-                      No transition selected
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      Select a transition point in the timeline to edit it
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatDuration(calculateTotalDuration())}
+                  </Badge>
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Music className="h-3 w-3" />
+                    {tracks.length} tracks
+                  </Badge>
+                  {mixEnergy > 0 && (
+                    <Badge
+                      variant="outline"
+                      className="flex items-center gap-1"
+                    >
+                      <BarChart2 className="h-3 w-3" />
+                      Energy: {Math.round(mixEnergy)}%
+                    </Badge>
+                  )}
+                </div>
+              </div>
 
-            <TabsContent
-              value="preview"
-              className="flex-1 p-4 overflow-auto m-0"
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle>Mix Preview</CardTitle>
-                  <CardDescription>
-                    Listen to your mix and check how the transitions sound
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {tracks.length > 0 ? (
-                    <div className="space-y-6">
-                      <div className="relative h-40 bg-muted rounded-md overflow-hidden">
-                        {/* Waveform visualization would go here */}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <p className="text-muted-foreground">
-                            Waveform visualization
-                          </p>
-                        </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Label
+                    htmlFor="auto-analyze"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Auto-analyze
+                  </Label>
+                  <Switch
+                    id="auto-analyze"
+                    checked={autoAnalyzeEnabled}
+                    onCheckedChange={setAutoAnalyzeEnabled}
+                  />
+                </div>
 
-                        {/* Playback controls */}
-                        <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                          <div className="bg-background/80 backdrop-blur-sm rounded-full p-2 flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 rounded-full"
-                            >
-                              <SkipBack className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="default"
-                              size="icon"
-                              className="h-10 w-10 rounded-full"
-                            >
-                              <Play className="h-5 w-5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 rounded-full"
-                            >
-                              <SkipForward className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    Completion:
+                  </span>
+                  <Progress
+                    value={mixProgress}
+                    className="w-24 h-2"
+                    style={
+                      {
+                        "--progress-color":
+                          mixProgress < 50
+                            ? "hsl(var(--warning))"
+                            : mixProgress < 80
+                              ? "hsl(var(--info))"
+                              : "hsl(var(--success))",
+                      } as React.CSSProperties
+                    }
+                  />
+                  <span className="text-xs font-medium">{mixProgress}%</span>
+                </div>
+              </div>
+            </div>
 
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>0:00</span>
-                          <span>
-                            {formatDuration(calculateTotalDuration())}
-                          </span>
-                        </div>
-                        <Slider
-                          defaultValue={[0]}
-                          max={calculateTotalDuration()}
-                          step={1}
-                        />
-                      </div>
+            {showSaveSuccess && (
+              <Alert className="mt-4 bg-green-50 text-green-800 border-green-200">
+                <Check className="h-4 w-4" />
+                <AlertTitle>Success</AlertTitle>
+                <AlertDescription>
+                  Your mix has been saved successfully.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
 
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium">
-                          Currently Playing
-                        </h3>
-                        <div className="p-3 bg-muted rounded-md">
-                          <div className="font-medium">{tracks[0].title}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {tracks[0].artist}
-                          </div>
-                        </div>
-                      </div>
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left sidebar - Track selector */}
+            <TrackSelector
+              selectedTrack={selectedTrack}
+              onTrackSelect={handleAddTrack}
+              compatibleKeys={getCompatibleKeys()}
+              handleAddTrack={handleAddTrack}
+            />
 
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium">
-                          Playback Settings
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="playback-speed">
-                              Playback Speed
-                            </Label>
-                            <Select defaultValue="1">
-                              <SelectTrigger id="playback-speed">
-                                <SelectValue placeholder="Select speed" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="0.5">0.5x</SelectItem>
-                                <SelectItem value="0.75">0.75x</SelectItem>
-                                <SelectItem value="1">1x (Normal)</SelectItem>
-                                <SelectItem value="1.25">1.25x</SelectItem>
-                                <SelectItem value="1.5">1.5x</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+            {/* Main content area */}
+            <div className="flex-1 overflow-auto p-4">
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full h-full"
+              >
+                <TabsList className="mb-4">
+                  <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                  <TabsTrigger value="transition">
+                    Transition Editor
+                  </TabsTrigger>
+                  <TabsTrigger value="details">Mix Details</TabsTrigger>
+                </TabsList>
 
-                          <div className="space-y-2">
-                            <Label htmlFor="volume">Volume</Label>
-                            <Slider
-                              id="volume"
-                              defaultValue={[80]}
-                              max={100}
-                              step={1}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                <TabsContent value="timeline" className="h-[calc(100%-40px)]">
+                  <div className="flex flex-col h-full">
+                    <div className="flex-1">
+                      <MixTimeline
+                        tracks={tracks}
+                        transitions={transitions}
+                        onTrackMove={handleTrackMove}
+                        onTrackRemove={handleRemoveTrack}
+                        onTransitionAdjust={(fromId, toId, data) => {
+                          const key = `${fromId}-${toId}`;
+                          setTransitions({
+                            ...transitions,
+                            [key]: {
+                              ...transitions[key],
+                              ...data,
+                              fromTrackId: fromId,
+                              toTrackId: toId,
+                            },
+                          });
+                        }}
+                        onPreviewTransition={handleTransitionSelect}
+                      />
                     </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="transition" className="h-[calc(100%-40px)]">
+                  {currentTransition.fromTrack && currentTransition.toTrack ? (
+                    <TransitionEditor
+                      currentTrack={currentTransition.fromTrack}
+                      nextTrack={currentTransition.toTrack}
+                      transitionDuration={currentTransition.duration}
+                      transitionNotes={currentTransition.notes}
+                      onSaveTransition={handleSaveTransition}
+                    />
                   ) : (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">
-                        Add tracks to your mix to enable preview
+                    <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                      <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium mb-2">
+                        No Transition Selected
+                      </h3>
+                      <p className="text-xs text-muted-foreground max-w-md">
+                        Select a transition point between two tracks in the
+                        timeline to edit it. You can click on the transition
+                        markers or use the "Preview" button on any transition.
                       </p>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+                </TabsContent>
 
-            <TabsContent
-              value="settings"
-              className="flex-1 p-4 overflow-auto m-0"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Mix Information</CardTitle>
-                    <CardDescription>
-                      Basic information about your mix
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="mix-title">Title</Label>
-                      <Input
-                        id="mix-title"
-                        value={mixTitle}
-                        onChange={(e) => setMixTitle(e.target.value)}
-                        placeholder="Enter mix title"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="mix-genre">Genre</Label>
-                      <Select value={mixGenre} onValueChange={setMixGenre}>
-                        <SelectTrigger id="mix-genre">
-                          <SelectValue placeholder="Select genre" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="house">House</SelectItem>
-                          <SelectItem value="techno">Techno</SelectItem>
-                          <SelectItem value="trance">Trance</SelectItem>
-                          <SelectItem value="drum-and-bass">
-                            Drum & Bass
-                          </SelectItem>
-                          <SelectItem value="dubstep">Dubstep</SelectItem>
-                          <SelectItem value="ambient">Ambient</SelectItem>
-                          <SelectItem value="hip-hop">Hip Hop</SelectItem>
-                          <SelectItem value="pop">Pop</SelectItem>
-                          <SelectItem value="rock">Rock</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="mix-description">Description</Label>
-                      <Textarea
-                        id="mix-description"
-                        value={mixDescription}
-                        onChange={(e) => setMixDescription(e.target.value)}
-                        placeholder="Describe your mix..."
-                        className="min-h-[100px]"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="mix-energy"
-                        className="flex justify-between"
-                      >
-                        <span>Energy Level</span>
-                        <span>{mixEnergy.toFixed(0)}%</span>
-                      </Label>
-                      <Progress value={mixEnergy} className="h-2" />
-                      <p className="text-xs text-muted-foreground">
-                        Energy level is calculated based on the tracks in your
-                        mix
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Export Settings</CardTitle>
-                    <CardDescription>
-                      Configure how your mix will be exported
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="export-format">File Format</Label>
-                      <Select
-                        value={exportFormat}
-                        onValueChange={setExportFormat}
-                      >
-                        <SelectTrigger id="export-format">
-                          <SelectValue placeholder="Select format" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="mp3">MP3</SelectItem>
-                          <SelectItem value="wav">WAV</SelectItem>
-                          <SelectItem value="aac">AAC</SelectItem>
-                          <SelectItem value="flac">FLAC</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="export-quality">Quality</Label>
-                      <Select
-                        value={exportQuality}
-                        onValueChange={setExportQuality}
-                      >
-                        <SelectTrigger id="export-quality">
-                          <SelectValue placeholder="Select quality" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="128">128 kbps</SelectItem>
-                          <SelectItem value="192">192 kbps</SelectItem>
-                          <SelectItem value="256">256 kbps</SelectItem>
-                          <SelectItem value="320">320 kbps</SelectItem>
-                          <SelectItem value="lossless">Lossless</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="normalize-audio">Normalize Audio</Label>
-                        <Switch id="normalize-audio" defaultChecked />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Automatically adjust volume levels across all tracks
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="auto-analyze">
-                          Auto-Analyze Tracks
-                        </Label>
-                        <Switch
-                          id="auto-analyze"
-                          checked={autoAnalyzeEnabled}
-                          onCheckedChange={setAutoAnalyzeEnabled}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Automatically analyze tracks for key and BPM when added
-                      </p>
-                    </div>
-
-                    <div className="pt-2">
-                      <Button
-                        onClick={handleExportMix}
-                        disabled={isExporting || tracks.length === 0}
-                        className="w-full"
-                      >
-                        {isExporting ? "Exporting..." : "Export Mix"}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
+                <TabsContent value="details" className="h-[calc(100%-40px)]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Mix Details</CardTitle>
+                        <CardDescription>
+                          Add information about your mix
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4"></CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
         </div>
-      </div>
-
-      {/* Harmonic Wheel Dialog */}
-      <Dialog open={showHarmonicWheel} onOpenChange={setShowHarmonicWheel}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Harmonic Wheel</DialogTitle>
-            <DialogDescription>
-              Use the harmonic wheel to find compatible keys for your mix
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center py-4">
-            <HarmonicWheel
-              selectedKey={selectedKey}
-              onKeySelect={onKeySelect}
-              size={300}
-              highlightCompatible={true}
-            />
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setShowHarmonicWheel(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Share Dialog */}
-      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Share Your Mix</DialogTitle>
-            <DialogDescription>
-              Share your mix with other DJs or on social media
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="share-link">Share Link</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="share-link"
-                  readOnly
-                  value={`https://harmonic-dj.example.com/mix/${mixTitle.toLowerCase().replace(/\s+/g, "-")}`}
-                />
-                <Button variant="outline" size="icon">
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Share on Social Media</Label>
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1">
-                  <Twitter className="h-4 w-4 mr-2" />
-                  Twitter
-                </Button>
-                <Button variant="outline" className="flex-1">
-                  <Facebook className="h-4 w-4 mr-2" />
-                  Facebook
-                </Button>
-                <Button variant="outline" className="flex-1">
-                  <Instagram className="h-4 w-4 mr-2" />
-                  Instagram
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setShowShareDialog(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      )}
     </div>
   );
 };

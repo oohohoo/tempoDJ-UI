@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Play,
   Pause,
@@ -7,6 +7,8 @@ import {
   Save,
   Volume2,
   VolumeX,
+  Music,
+  Waveform,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 interface TransitionEditorProps {
   currentTrack?: {
@@ -67,6 +77,17 @@ const TransitionEditor = ({
   const [notes, setNotes] = useState(transitionNotes);
   const [volume, setVolume] = useState(80);
   const [isMuted, setIsMuted] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [transitionPoint, setTransitionPoint] = useState(0.7); // 70% of first track
+  const [transitionType, setTransitionType] = useState("beatmatch");
+
+  // Reset state when tracks change
+  useEffect(() => {
+    setDuration(transitionDuration);
+    setNotes(transitionNotes);
+    setCurrentTime(0);
+    setIsPlaying(false);
+  }, [currentTrack.id, nextTrack.id, transitionDuration, transitionNotes]);
 
   const handlePlayPause = () => {
     setIsPlaying(!isPlaying);
@@ -84,54 +105,123 @@ const TransitionEditor = ({
     setIsMuted(!isMuted);
   };
 
+  // Format time from seconds to MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  // Calculate transition position for visualization
+  const getTransitionPosition = () => {
+    // Assuming track duration is in seconds
+    const trackDuration = 240; // 4 minutes as example
+    return Math.floor(trackDuration * transitionPoint);
+  };
+
   return (
     <div className="w-full bg-background border rounded-lg p-4 shadow-md">
       <div className="flex flex-col space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-bold">Transition Editor</h2>
-          <Button variant="outline" size="sm" onClick={handleSaveTransition}>
-            <Save className="mr-2 h-4 w-4" />
-            Save Transition
-          </Button>
+          <div className="flex gap-2">
+            <Select value={transitionType} onValueChange={setTransitionType}>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue placeholder="Transition type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="beatmatch">Beatmatch</SelectItem>
+                <SelectItem value="cut">Cut</SelectItem>
+                <SelectItem value="fade">Fade</SelectItem>
+                <SelectItem value="filter">Filter</SelectItem>
+                <SelectItem value="echo">Echo</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="default" size="sm" onClick={handleSaveTransition}>
+              <Save className="mr-2 h-4 w-4" />
+              Save Transition
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Waveform visualization */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">
-                Current Track: {currentTrack.title} - {currentTrack.artist}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-24 bg-gray-100 rounded-md overflow-hidden">
+        {/* Visual transition preview */}
+        <div className="bg-muted/30 rounded-lg p-4 border">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Music className="h-4 w-4 text-primary" />
+              <span className="font-medium">{currentTrack.title}</span>
+              <span className="text-muted-foreground">
+                by {currentTrack.artist}
+              </span>
+            </div>
+            <Badge variant="outline">
+              {formatTime(getTransitionPosition())} / 4:00
+            </Badge>
+          </div>
+
+          <div className="relative h-32 mb-4 bg-black/10 rounded-md overflow-hidden">
+            {/* First track waveform */}
+            <div className="absolute inset-0 flex">
+              <div className="flex-1 relative overflow-hidden">
                 <img
                   src={currentTrack.waveform}
                   alt="Track waveform"
-                  className="w-full h-full object-cover opacity-50"
+                  className="w-full h-full object-cover opacity-40"
                 />
-                <div className="relative h-1 bg-primary w-1/3 -mt-12 mx-4"></div>
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent to-primary/30"
+                  style={{
+                    clipPath: `inset(0 ${100 - transitionPoint * 100}% 0 0)`,
+                  }}
+                ></div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">
-                Next Track: {nextTrack.title} - {nextTrack.artist}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-24 bg-gray-100 rounded-md overflow-hidden">
+              {/* Second track waveform */}
+              <div className="flex-1 relative overflow-hidden">
                 <img
                   src={nextTrack.waveform}
                   alt="Track waveform"
-                  className="w-full h-full object-cover opacity-50"
+                  className="w-full h-full object-cover opacity-40"
                 />
-                <div className="relative h-1 bg-secondary w-1/3 -mt-12 mx-4"></div>
+                <div
+                  className="absolute inset-0 bg-gradient-to-l from-transparent to-secondary/30"
+                  style={{ clipPath: `inset(0 0 0 ${transitionPoint * 100}%)` }}
+                ></div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+            {/* Transition point indicator */}
+            <div
+              className="absolute top-0 bottom-0 w-1 bg-white z-10 cursor-ew-resize"
+              style={{ left: `${transitionPoint * 100}%` }}
+            >
+              <div className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-white"></div>
+              <div className="absolute -bottom-1 -left-1 w-3 h-3 rounded-full bg-white"></div>
+            </div>
+
+            {/* Playback position indicator */}
+            {isPlaying && (
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20"
+                style={{ left: `${(currentTime / 240) * 100}%` }}
+              >
+                <div className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-red-500"></div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Music className="h-4 w-4 text-secondary" />
+              <span className="font-medium">{nextTrack.title}</span>
+              <span className="text-muted-foreground">
+                by {nextTrack.artist}
+              </span>
+            </div>
+            <Badge variant="outline" className="bg-secondary/10">
+              Transition: {transitionType}
+            </Badge>
+          </div>
         </div>
 
         {/* Transition controls */}
@@ -142,7 +232,13 @@ const TransitionEditor = ({
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="outline" size="icon" onClick={() => {}}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() =>
+                          setCurrentTime(Math.max(0, currentTime - 10))
+                        }
+                      >
                         <SkipBack className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -177,7 +273,13 @@ const TransitionEditor = ({
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="outline" size="icon" onClick={() => {}}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() =>
+                          setCurrentTime(Math.min(240, currentTime + 10))
+                        }
+                      >
                         <SkipForward className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -188,7 +290,41 @@ const TransitionEditor = ({
                 </TooltipProvider>
               </div>
 
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium">Playback Position</span>
+                  <span className="text-sm">{formatTime(currentTime)}</span>
+                </div>
+                <Slider
+                  value={[currentTime]}
+                  min={0}
+                  max={240}
+                  step={1}
+                  onValueChange={(value) => setCurrentTime(value[0])}
+                />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium">
+                      Transition Point
+                    </span>
+                    <span className="text-sm">
+                      {Math.round(transitionPoint * 100)}%
+                    </span>
+                  </div>
+                  <Slider
+                    value={[transitionPoint * 100]}
+                    min={10}
+                    max={90}
+                    step={1}
+                    onValueChange={(value) =>
+                      setTransitionPoint(value[0] / 100)
+                    }
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm font-medium">
@@ -204,34 +340,34 @@ const TransitionEditor = ({
                     onValueChange={(value) => setDuration(value[0])}
                   />
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Volume</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleMute}
-                      className="p-0 h-8 w-8"
-                    >
-                      {isMuted ? (
-                        <VolumeX className="h-4 w-4" />
-                      ) : (
-                        <Volume2 className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <Slider
-                    value={[isMuted ? 0 : volume]}
-                    min={0}
-                    max={100}
-                    step={1}
-                    onValueChange={(value) => {
-                      setVolume(value[0]);
-                      if (value[0] > 0 && isMuted) setIsMuted(false);
-                    }}
-                  />
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Volume</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleMute}
+                    className="p-0 h-8 w-8"
+                  >
+                    {isMuted ? (
+                      <VolumeX className="h-4 w-4" />
+                    ) : (
+                      <Volume2 className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
+                <Slider
+                  value={[isMuted ? 0 : volume]}
+                  min={0}
+                  max={100}
+                  step={1}
+                  onValueChange={(value) => {
+                    setVolume(value[0]);
+                    if (value[0] > 0 && isMuted) setIsMuted(false);
+                  }}
+                />
               </div>
             </div>
           </CardContent>

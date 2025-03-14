@@ -1,27 +1,51 @@
 import React, { useState } from "react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+} from "../ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import { Checkbox } from "../ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "../ui/dropdown-menu";
 import {
-  MoreHorizontal,
+  Music,
+  Filter,
+  Search,
+  SlidersHorizontal,
+  MoreVertical,
+  Play,
+  Plus,
+  Download,
   Edit,
   Trash,
-  Download,
-  Clock,
-  Music,
 } from "lucide-react";
+import { Badge } from "../ui/badge";
+
+interface Track {
+  id: string;
+  title: string;
+  artist: string;
+  key: string;
+  bpm: number;
+  duration: string;
+  dateAdded: string;
+  imageUrl?: string;
+}
 
 interface Mix {
   id: string;
@@ -30,6 +54,7 @@ interface Mix {
   trackCount: number;
   duration: string;
   description?: string;
+  imageUrl?: string;
 }
 
 interface MixGridProps {
@@ -134,13 +159,41 @@ const MixGrid: React.FC<MixGridProps> = ({
             key={mix.id}
             className="overflow-hidden hover:shadow-lg transition-shadow"
           >
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <CardTitle className="text-xl">{mix.title}</CardTitle>
+            <div className="flex items-center p-3 border-b">
+              <div className="w-16 h-16 rounded-md overflow-hidden mr-3 flex-shrink-0 bg-gradient-to-r from-purple-500 to-blue-500 relative">
+                {mix.imageUrl ? (
+                  <img
+                    src={mix.imageUrl}
+                    alt={mix.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Music className="h-8 w-8 text-white opacity-50" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium">{mix.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {mix.description || "No description"}
+                </p>
+                <div className="mt-1">
+                  <Badge variant="outline" className="mr-1">
+                    BPM: 120-126
+                  </Badge>
+                  <Badge variant="outline">Energy: 4-6</Badge>
+                </div>
+              </div>
+              <div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreHorizontal className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 bg-black/30 hover:bg-black/50 text-white"
+                    >
+                      <MoreVertical className="h-4 w-4" />
                       <span className="sr-only">Actions</span>
                     </Button>
                   </DropdownMenuTrigger>
@@ -163,9 +216,27 @@ const MixGrid: React.FC<MixGridProps> = ({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              <CardDescription>
-                {mix.description || "No description provided"}
-              </CardDescription>
+            </div>
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                  <Badge className="mb-2">Warm-up Set</Badge>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium">Best For:</span> Warm-ups,
+                      early sets, chill venues
+                    </div>
+                    <div>
+                      <span className="font-medium">Mix Style:</span> Long
+                      blends, smooth transitions
+                    </div>
+                    <div>
+                      <span className="font-medium">Rules:</span> perfect +
+                      adjacent + same_number
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col gap-2">

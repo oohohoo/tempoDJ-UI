@@ -52,7 +52,7 @@ const TrackGrid: React.FC<{
             className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-4 p-4 items-center hover:bg-accent/50 cursor-pointer"
             onClick={() => onTrackSelect(track)}
           >
-            <div className="w-12 h-12 rounded-md overflow-hidden">
+            <div className="w-12 h-12 rounded-md overflow-hidden aspect-square">
               {track.imageUrl ? (
                 <img
                   src={track.imageUrl}

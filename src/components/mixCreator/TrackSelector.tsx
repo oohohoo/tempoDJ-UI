@@ -31,6 +31,7 @@ interface Track {
   bpm: number;
   duration: string;
   compatible?: boolean;
+  waveform?: string;
 }
 
 interface TrackSelectorProps {
@@ -41,9 +42,10 @@ interface TrackSelectorProps {
 
 const TrackSelector = ({
   selectedTrack = null,
-  onTrackSelect = () => {},
+  onTrackSelect = (track) => handleAddTrack(track),
   compatibleKeys = ["Am", "Em", "Dm", "Gm", "Cm"],
-}: TrackSelectorProps) => {
+  handleAddTrack = (track: Track) => {},
+}: TrackSelectorProps & { handleAddTrack?: (track: Track) => void }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [bpmRange, setBpmRange] = useState<[number, number]>([90, 140]);
   const [activeTab, setActiveTab] = useState("library");
@@ -58,6 +60,8 @@ const TrackSelector = ({
       bpm: 128,
       duration: "6:45",
       compatible: true,
+      waveform:
+        "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&q=80",
     },
     {
       id: "2",
@@ -67,6 +71,8 @@ const TrackSelector = ({
       bpm: 125,
       duration: "7:12",
       compatible: true,
+      waveform:
+        "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&q=80",
     },
     {
       id: "3",
@@ -76,6 +82,8 @@ const TrackSelector = ({
       bpm: 130,
       duration: "5:30",
       compatible: true,
+      waveform:
+        "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&q=80",
     },
     {
       id: "4",
@@ -85,6 +93,8 @@ const TrackSelector = ({
       bpm: 122,
       duration: "8:15",
       compatible: false,
+      waveform:
+        "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&q=80",
     },
     {
       id: "5",
@@ -94,6 +104,8 @@ const TrackSelector = ({
       bpm: 135,
       duration: "6:20",
       compatible: false,
+      waveform:
+        "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=300&q=80",
     },
     {
       id: "6",
@@ -103,6 +115,8 @@ const TrackSelector = ({
       bpm: 118,
       duration: "7:45",
       compatible: true,
+      waveform:
+        "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=300&q=80",
     },
     {
       id: "7",
@@ -112,6 +126,8 @@ const TrackSelector = ({
       bpm: 126,
       duration: "5:55",
       compatible: true,
+      waveform:
+        "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&q=80",
     },
     {
       id: "8",
@@ -121,6 +137,8 @@ const TrackSelector = ({
       bpm: 124,
       duration: "6:10",
       compatible: true,
+      waveform:
+        "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&q=80",
     },
   ];
 
@@ -194,12 +212,26 @@ const TrackSelector = ({
                   onClick={() => onTrackSelect(track)}
                 >
                   <CardContent className="p-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-medium">{track.title}</h4>
-                        <p className="text-sm text-gray-500">{track.artist}</p>
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 rounded-md overflow-hidden mr-3 flex-shrink-0">
+                        {track.waveform ? (
+                          <img
+                            src={track.waveform}
+                            alt={track.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center w-full h-full bg-muted">
+                            <Music className="h-5 w-5 text-muted-foreground opacity-50" />
+                          </div>
+                        )}
                       </div>
-                      <Music className="h-4 w-4 text-gray-400" />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium truncate">{track.title}</h4>
+                        <p className="text-sm text-gray-500 truncate">
+                          {track.artist}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex mt-2 gap-2">
                       <Badge variant="outline" className="text-xs">
@@ -233,17 +265,28 @@ const TrackSelector = ({
                       className={`cursor-pointer hover:bg-gray-50 transition-colors ${selectedTrack?.id === track.id ? "border-primary" : ""}`}
                       onClick={() => onTrackSelect(track)}
                     >
-                      <CardContent className="p-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-medium">{track.title}</h4>
-                            <p className="text-sm text-gray-500">
-                              {track.artist}
-                            </p>
+                      <div className="aspect-square bg-muted">
+                        {track.waveform ? (
+                          <img
+                            src={track.waveform}
+                            alt={track.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center w-full h-full">
+                            <Music className="h-12 w-12 text-muted-foreground opacity-50" />
                           </div>
-                          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">
-                            Compatible
-                          </Badge>
+                        )}
+                        <Badge className="absolute top-2 right-2 bg-green-100 text-green-800 hover:bg-green-100 text-xs">
+                          Compatible
+                        </Badge>
+                      </div>
+                      <CardContent className="p-3">
+                        <div>
+                          <h4 className="font-medium">{track.title}</h4>
+                          <p className="text-sm text-gray-500">
+                            {track.artist}
+                          </p>
                         </div>
                         <div className="flex mt-2 gap-2">
                           <Badge variant="outline" className="text-xs">
