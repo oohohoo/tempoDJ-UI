@@ -4,7 +4,7 @@ import Header from "./layout/Header";
 import Sidebar from "./layout/Sidebar";
 import DashboardOverview from "./dashboard/DashboardOverview";
 import MixCreator from "./mixCreator/MixCreator";
-import TrackLibrary from "./trackLibrary/TrackLibrary";
+import Collection from "./collection/Collection";
 import SavedMixes from "./savedMixes/SavedMixes";
 import HarmonicWheel from "./common/HarmonicWheel";
 import ProfilePage from "./profile/ProfilePage";
@@ -22,7 +22,7 @@ import { Button } from "./ui/button";
 type ActiveView =
   | "dashboard"
   | "mixCreator"
-  | "trackLibrary"
+  | "collection"
   | "savedMixes"
   | "profile"
   | "settings"
@@ -45,8 +45,8 @@ const Home = () => {
       case "mixCreator":
         window.history.pushState({}, "", "/create-mix");
         break;
-      case "trackLibrary":
-        window.history.pushState({}, "", "/track-library");
+      case "collection":
+        window.history.pushState({}, "", "/collection");
         break;
       case "savedMixes":
         window.history.pushState({}, "", "/saved-mixes");
@@ -71,8 +71,8 @@ const Home = () => {
     const path = location.pathname;
     if (path === "/create-mix") {
       setActiveView("mixCreator");
-    } else if (path === "/track-library") {
-      setActiveView("trackLibrary");
+    } else if (path === "/collection") {
+      setActiveView("collection");
     } else if (path === "/saved-mixes") {
       setActiveView("savedMixes");
     } else if (path === "/profile") {
@@ -148,8 +148,8 @@ const Home = () => {
             />
           </div>
         );
-      case "trackLibrary":
-        return <TrackLibrary />;
+      case "collection":
+        return <Collection />;
       case "savedMixes":
         return <SavedMixes />;
       case "profile":
@@ -222,9 +222,9 @@ const Home = () => {
             </Button>
 
             <Button
-              variant={activeView === "trackLibrary" ? "default" : "ghost"}
+              variant={activeView === "collection" ? "default" : "ghost"}
               size="sm"
-              onClick={() => navigateTo("trackLibrary")}
+              onClick={() => navigateTo("collection")}
               className="flex items-center gap-1"
             >
               <Library className="h-4 w-4" />
@@ -280,12 +280,12 @@ const Home = () => {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      navigateTo("trackLibrary");
+                      navigateTo("collection");
                     }}
                     className="text-gray-400 hover:text-white transition-colors flex items-center gap-2"
                   >
                     <Library className="h-4 w-4" />
-                    Track Library
+                    Collection
                   </a>
                 </li>
                 <li>
