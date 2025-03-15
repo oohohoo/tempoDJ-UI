@@ -23,6 +23,7 @@ import {
   Pause,
   Wand2,
   Check,
+  Puzzle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,7 @@ import TransitionEditor from "./TransitionEditor";
 import HarmonicWheel from "../common/HarmonicWheel";
 import MixCreationSelector from "./MixCreationSelector";
 import SmartMixGenerator from "./SmartMixGenerator";
+import ModularBlocksCreator from "./ModularBlocksCreator";
 
 interface Track {
   id: string;
@@ -129,7 +131,7 @@ const MixCreator = ({
   onExportMix = () => {},
 }: MixCreatorProps) => {
   const [creationMethod, setCreationMethod] = useState<
-    "selector" | "manual" | "smart"
+    "selector" | "manual" | "smart" | "modular"
   >("selector");
   const [mixTitle, setMixTitle] = useState(initialMixTitle);
   const [mixDescription, setMixDescription] = useState("");
@@ -524,14 +526,69 @@ const MixCreator = ({
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
+  // Handle modular blocks creation completion
+  const handleModularBlocksComplete = (blocks: any[], bridges: any[]) => {
+    // Convert blocks and bridges to tracks and transitions
+    const newTracks: Track[] = [];
+    const newTransitions: Record<string, Transition> = {};
+
+    // Process each block to create tracks
+    blocks.forEach((block) => {
+      block.trackPositions.forEach((position: any) => {
+        if (position.trackId) {
+          const track: Track = {
+            id: position.trackId,
+            title: position.trackName || `Track in ${block.name}`,
+            artist: "Unknown Artist",
+            key: position.key,
+            bpm: 128, // Default BPM
+            duration: 240, // Default duration in seconds
+            energy: position.energy,
+            color: block.color,
+            startPosition:
+              newTracks.length > 0 ? calculateStartPosition(newTracks) : 0,
+          };
+          newTracks.push(track);
+        }
+      });
+    });
+
+    // Process bridges to create transitions
+    bridges.forEach((bridge) => {
+      if (
+        bridge.trackPositions.length >= 2 &&
+        bridge.trackPositions[0].trackId &&
+        bridge.trackPositions[1].trackId
+      ) {
+        const fromTrackId = bridge.trackPositions[0].trackId;
+        const toTrackId = bridge.trackPositions[1].trackId;
+        const transitionKey = `${fromTrackId}-${toTrackId}`;
+
+        newTransitions[transitionKey] = {
+          fromTrackId,
+          toTrackId,
+          duration: 16, // Default duration
+          notes: `${bridge.type} transition`,
+          type: bridge.type.toLowerCase(),
+          startPoint: 0.8,
+          endPoint: 0.2,
+          effectsApplied: [],
+        };
+      }
+    });
+
+    // Update state with new tracks and transitions
+    setTracks(newTracks);
+    setTransitions(newTransitions);
+    setCreationMethod("manual"); // Switch to manual mode to edit the created mix
+  };
+
   // Render the component UI
   return (
     <div className="w-full h-full bg-background">
       {creationMethod === "selector" && (
         <MixCreationSelector
-          onSelectMethod={(method) =>
-            setCreationMethod(method === "manual" ? "manual" : "smart")
-          }
+          onSelectMethod={(method) => setCreationMethod(method)}
         />
       )}
 
@@ -541,6 +598,13 @@ const MixCreator = ({
             setTracks(generatedTracks);
             setCreationMethod("manual");
           }}
+          onCancel={() => setCreationMethod("selector")}
+        />
+      )}
+
+      {creationMethod === "modular" && (
+        <ModularBlocksCreator
+          onComplete={handleModularBlocksComplete}
           onCancel={() => setCreationMethod("selector")}
         />
       )}
@@ -712,6 +776,7 @@ const MixCreator = ({
                     Transition Editor
                   </TabsTrigger>
                   <TabsTrigger value="details">Mix Details</TabsTrigger>
+                  <TabsTrigger value="modular">Modular Blocks</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="timeline" className="h-[calc(100%-40px)]">
@@ -773,8 +838,38 @@ const MixCreator = ({
                           Add information about your mix
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-4"></CardContent>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="mix-description">Description</Label>
+                          <Textarea
+                            id="mix-description"
+                            placeholder="Describe your mix..."
+                            value={mixDescription}
+                            onChange={(e) => setMixDescription(e.target.value)}
+                          />
+                        </div>
+                      </CardContent>
                     </Card>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="modular" className="h-[calc(100%-40px)]">
+                  <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                    <Puzzle className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">
+                      Modular Blocks Editor
+                    </h3>
+                    <p className="text-xs text-muted-foreground max-w-md mb-4">
+                      You can use the modular blocks approach to quickly create
+                      structured mixes with consistent harmonic patterns.
+                    </p>
+                    <Button
+                      onClick={() => setCreationMethod("modular")}
+                      className="flex items-center gap-2"
+                    >
+                      <Puzzle className="h-4 w-4" />
+                      Open Modular Blocks Editor
+                    </Button>
                   </div>
                 </TabsContent>
               </Tabs>
